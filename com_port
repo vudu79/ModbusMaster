@@ -1,0 +1,1358 @@
+Для работы с COM-портами (в macOS это обычно устройства типа /dev/tty.* или /dev/cu.*) в проекте на CLion нужно:
+
+1. Общие моменты
+В macOS COM-порты представлены как файлы устройств в /dev/.
+Для работы с ними обычно используют POSIX API (open(), read(), write(), termios и т.п.).
+Специальных библиотек для «COM-портов» в macOS нет, как в Windows, но можно использовать кроссплатформенные библиотеки (например, libserialport).
+2. Настройка проекта в CLion
+Шаг 1. Создайте проект с поддержкой POSIX
+В CMakeLists.txt достаточно стандартной настройки:
+
+cmake
+
+cmake_minimum_required(VERSION 3.16)
+project(SerialPortExample LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable(SerialPortExample main.cpp)
+
+# Для macOS можно добавить флаг, если нужно
+if(APPLE)
+    target_compile_definitions(SerialPortExample PRIVATE MACOS)
+endif()
+Шаг 2. В коде используйте POSIX API
+Пример простого открытия и настройки порта:
+
+cpp
+
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <iostream>
+#include <cstring>
+
+int main() {
+    const char* portname = "/dev/cu.usbserial-0001"; // замените на ваш порт
+
+    int fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0) {
+        std::cerr << "Error opening " << portname << ": " << strerror(errno) << "\n";
+        return 1;
+    }
+
+    struct termios tty;
+    if (tcgetattr(fd, &tty) != 0) {
+        std::cerr << "Error from tcgetattr: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    }
+
+    cfsetospeed(&tty, B9600);
+    cfsetispeed(&tty, B9600);
+
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
+    tty.c_iflag &= ~IGNBRK;         // disable break processing
+    tty.c_lflag = 0;                // no signaling chars, no echo, no canonical processing
+    tty.c_oflag = 0;                // no remapping, no delays
+    tty.c_cc[VMIN]  = 0;            // read doesn't block
+    tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+
+    tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls, enable reading
+    tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cflag &= ~CRTSCTS;
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        std::cerr << "Error from tcsetattr: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    }
+
+    // Теперь можно читать/писать в fd
+    // ...
+
+    close(fd);
+    return 0;
+}
+Шаг 3. Запуск и права доступа
+Убедитесь, что у вас есть права на доступ к устройству /dev/cu.*.
+Обычно нужно запускать программу с правами пользователя, который входит в группу wheel или uucp.
+Можно проверить права командой:
+bash
+
+ls -l /dev/cu.*
+Если доступа нет, можно временно дать права:
+bash
+
+sudo chmod 666 /dev/cu.usbserial-0001
+Шаг 4. Настройка CLion
+В CLion обычно не нужно ничего особенного для работы с COM-портами.
+Просто создайте проект с main.cpp, добавьте код, соберите и запустите.
+Если используете сторонние библиотеки (например, libserialport), добавьте их в CMakeLists.txt и установите через Homebrew:
+bash
+
+brew install libserialport
+И в CMakeLists.txt:
+
+cmake
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBSERIALPORT REQUIRED libserialport)
+
+target_include_directories(SerialPortExample PRIVATE ${LIBSERIALPORT_INCLUDE_DIRS})
+target_link_libraries(SerialPortExample PRIVATE ${LIBSERIALPORT_LIBRARIES})
+Итог
+Для работы с COM-портами на macOS используйте POSIX API.
+В CLion настройте обычный C++ проект.
+Убедитесь, что у вас есть права на доступ к устройству.
+При необходимости используйте сторонние библиотеки.
+Если нужно, могу помочь с примером кода или настройкой конкретной библиотеки.
+
+
+
+
+
+
+
+
+раскаи поднобно об этом коде
+Конечно! Давайте подробно разберём этот пример кода для работы с COM-портом (последовательным портом) в macOS с использованием POSIX API.
+
+Код целиком
+cpp
+
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <iostream>
+#include <cstring>
+
+int main() {
+    const char* portname = "/dev/cu.usbserial-0001"; // замените на ваш порт
+
+    int fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0) {
+        std::cerr << "Error opening " << portname << ": " << strerror(errno) << "\n";
+        return 1;
+    }
+
+    struct termios tty;
+    if (tcgetattr(fd, &tty) != 0) {
+        std::cerr << "Error from tcgetattr: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    }
+
+    cfsetospeed(&tty, B9600);
+    cfsetispeed(&tty, B9600);
+
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
+    tty.c_iflag &= ~IGNBRK;         // disable break processing
+    tty.c_lflag = 0;                // no signaling chars, no echo, no canonical processing
+    tty.c_oflag = 0;                // no remapping, no delays
+    tty.c_cc[VMIN]  = 0;            // read doesn't block
+    tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+
+    tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls, enable reading
+    tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cflag &= ~CRTSCTS;
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        std::cerr << "Error from tcsetattr: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    }
+
+    // Теперь можно читать/писать в fd
+    // ...
+
+    close(fd);
+    return 0;
+}
+Подробный разбор
+1. Подключаемые заголовки
+<fcntl.h> — для функции open(), флагов открытия файла.
+<termios.h> — для управления настройками последовательного порта.
+<unistd.h> — для функций close(), read(), write().
+<iostream> — для вывода ошибок.
+<cstring> — для функции strerror() (перевод кода ошибки в строку).
+2. Открытие порта
+cpp
+
+const char* portname = "/dev/cu.usbserial-0001"; // замените на ваш порт
+
+int fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
+portname — путь к устройству последовательного порта в macOS. Обычно устройства начинаются с /dev/cu. или /dev/tty..
+open() открывает файл устройства:
+O_RDWR — открываем для чтения и записи.
+O_NOCTTY — не делать этот порт управляющим терминалом для процесса.
+O_SYNC — операции записи синхронные (ждут физического завершения).
+Если open() возвращает отрицательное значение — ошибка.
+
+3. Проверка ошибки открытия
+cpp
+
+if (fd < 0) {
+    std::cerr << "Error opening " << portname << ": " << strerror(errno) << "\n";
+    return 1;
+}
+Если fd < 0, выводим ошибку с помощью strerror(errno) — описание последней ошибки.
+4. Получение текущих настроек порта
+cpp
+
+struct termios tty;
+if (tcgetattr(fd, &tty) != 0) {
+    std::cerr << "Error from tcgetattr: " << strerror(errno) << "\n";
+    close(fd);
+    return 1;
+}
+tcgetattr() считывает текущие настройки терминала (последовательного порта) в структуру termios.
+Если ошибка — выводим и закрываем порт.
+5. Установка скорости передачи
+cpp
+
+cfsetospeed(&tty, B9600);
+cfsetispeed(&tty, B9600);
+cfsetospeed() — устанавливает скорость передачи для передачи (output).
+cfsetispeed() — для приёма (input).
+B9600 — скорость 9600 бод (часто используется по умолчанию).
+6. Настройка параметров порта
+cpp
+
+tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
+c_cflag — флаги управления.
+CSIZE — маска для размера символа.
+CS8 — 8 бит на символ (без чётности).
+cpp
+
+tty.c_iflag &= ~IGNBRK;         // disable break processing
+c_iflag — флаги входных опций.
+IGNBRK — игнорировать сигнал break (прерывание линии). Здесь отключаем игнорирование.
+cpp
+
+tty.c_lflag = 0;                // no signaling chars, no echo, no canonical processing
+c_lflag — локальные флаги.
+Обнуляем — отключаем канонический режим (чтение построчно), отключаем эхо и сигнальные символы.
+cpp
+
+tty.c_oflag = 0;                // no remapping, no delays
+c_oflag — флаги вывода.
+Обнуляем — отключаем любые преобразования вывода.
+cpp
+
+tty.c_cc[VMIN]  = 0;            // read doesn't block
+tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+c_cc — управляющие символы.
+VMIN = 0 — минимальное количество символов для чтения — 0 (чтение не блокируется).
+VTIME = 5 — таймаут чтения — 5 * 0.1 секунды = 0.5 секунды.
+cpp
+
+tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+Отключаем программное управление потоком (XON/XOFF).
+cpp
+
+tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls, enable reading
+CLOCAL — игнорировать контроль модема (не ждать сигналов CTS/DSR).
+CREAD — включить приём данных.
+cpp
+
+tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
+tty.c_cflag &= ~CSTOPB;
+tty.c_cflag &= ~CRTSCTS;
+Отключаем проверку чётности (PARENB, PARODD).
+Устанавливаем 1 стоп-бит (~CSTOPB).
+Отключаем аппаратное управление потоком (CRTSCTS).
+7. Применение настроек
+cpp
+
+if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+    std::cerr << "Error from tcsetattr: " << strerror(errno) << "\n";
+    close(fd);
+    return 1;
+}
+tcsetattr() применяет настройки.
+TCSANOW — применить сразу.
+Если ошибка — выводим и закрываем порт.
+8. Работа с портом
+cpp
+
+// Теперь можно читать/писать в fd
+// ...
+fd — файловый дескриптор порта.
+Можно использовать read(fd, buffer, size) и write(fd, buffer, size) для обмена данными.
+9. Закрытие порта
+cpp
+
+close(fd);
+Освобождаем ресурс.
+Итог
+Этот код:
+
+Открывает последовательный порт.
+Настраивает его на 9600 бод, 8N1 (8 бит, без чётности, 1 стоп-бит).
+Отключает управление потоком и канонический режим.
+Устанавливает таймаут чтения.
+Готовит порт к чтению и записи.
+Если хотите, могу помочь с примером чтения/записи данных или объяснить, как искать доступные порты в macOS.
+
+
+
+
+
+
+
+
+да
+Отлично! Давайте я покажу простой пример, как можно читать и писать данные в уже настроенный COM-порт на macOS, используя тот же подход с POSIX API.
+
+Пример чтения и записи в последовательный порт
+cpp
+
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <iostream>
+#include <cstring>
+
+int main() {
+    const char* portname = "/dev/cu.usbserial-0001"; // замените на ваш порт
+
+    int fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0) {
+        std::cerr << "Error opening " << portname << ": " << strerror(errno) << "\n";
+        return 1;
+    }
+
+    struct termios tty;
+    if (tcgetattr(fd, &tty) != 0) {
+        std::cerr << "Error from tcgetattr: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    }
+
+    cfsetospeed(&tty, B9600);
+    cfsetispeed(&tty, B9600);
+
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
+    tty.c_iflag &= ~IGNBRK;
+    tty.c_lflag = 0;
+    tty.c_oflag = 0;
+    tty.c_cc[VMIN]  = 0;
+    tty.c_cc[VTIME] = 5;
+
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+    tty.c_cflag |= (CLOCAL | CREAD);
+    tty.c_cflag &= ~(PARENB | PARODD);
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cflag &= ~CRTSCTS;
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        std::cerr << "Error from tcsetattr: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    }
+
+    // Пример записи строки в порт
+    const char* msg = "Hello, COM port!\n";
+    ssize_t written = write(fd, msg, strlen(msg));
+    if (written < 0) {
+        std::cerr << "Error writing to port: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    }
+    std::cout << "Sent " << written << " bytes\n";
+
+    // Пример чтения данных из порта
+    char buf[100];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    if (n < 0) {
+        std::cerr << "Error reading from port: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    } else if (n == 0) {
+        std::cout << "No data received (timeout)\n";
+    } else {
+        buf[n] = '\0'; // добавляем терминатор строки
+        std::cout << "Received: " << buf << "\n";
+    }
+
+    close(fd);
+    return 0;
+}
+Объяснение
+Запись:
+write(fd, msg, strlen(msg)) — отправляет строку в порт. Возвращает количество записанных байт или -1 при ошибке.
+
+Чтение:
+read(fd, buf, sizeof(buf) - 1) — пытается прочитать данные из порта.
+
+Если данных нет, и истек таймаут (0.5 сек), вернёт 0.
+Если данные есть — вернёт количество прочитанных байт.
+Добавляем '\0' в конец буфера, чтобы вывести как строку.
+Как узнать имя порта?
+В macOS последовательные порты обычно находятся в /dev/ и начинаются с:
+
+/dev/cu.* — для подключения к устройству (лучше использовать для программ).
+/dev/tty.* — для терминальных устройств.
+Чтобы увидеть список доступных портов, можно выполнить в терминале:
+
+bash
+
+ls /dev/cu.*
+Если хотите, могу помочь с более сложным примером — например, с циклическим чтением данных или с использованием потоков. Просто скажите!
+
+
+
+
+
+
+
+
+да
+Понял, вы хотите продолжить или получить более подробный пример. Вот расширенный пример с циклическим чтением и записью в COM-порт на macOS с обработкой ошибок и таймаутом.
+
+Расширенный пример: циклическое чтение и запись в COM-порт
+cpp
+
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <iostream>
+#include <cstring>
+#include <cerrno>
+
+int configurePort(int fd) {
+    struct termios tty;
+    if (tcgetattr(fd, &tty) != 0) {
+        std::cerr << "Error from tcgetattr: " << strerror(errno) << "\n";
+        return -1;
+    }
+
+    cfsetospeed(&tty, B9600);
+    cfsetispeed(&tty, B9600);
+
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
+    tty.c_iflag &= ~IGNBRK;                         // disable break processing
+    tty.c_lflag = 0;                                // no signaling chars, no echo, no canonical processing
+    tty.c_oflag = 0;                                // no remapping, no delays
+    tty.c_cc[VMIN]  = 0;                            // read doesn't block
+    tty.c_cc[VTIME] = 10;                           // 1 second read timeout
+
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);         // shut off xon/xoff ctrl
+
+    tty.c_cflag |= (CLOCAL | CREAD);                // ignore modem controls, enable reading
+    tty.c_cflag &= ~(PARENB | PARODD);              // shut off parity
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cflag &= ~CRTSCTS;
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        std::cerr << "Error from tcsetattr: " << strerror(errno) << "\n";
+        return -1;
+    }
+    return 0;
+}
+
+int main() {
+    const char* portname = "/dev/cu.usbserial-0001"; // замените на ваш порт
+
+    int fd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0) {
+        std::cerr << "Error opening " << portname << ": " << strerror(errno) << "\n";
+        return 1;
+    }
+
+    if (configurePort(fd) != 0) {
+        close(fd);
+        return 1;
+    }
+
+    const char* msg = "Ping\n";
+
+    for (int i = 0; i < 5; ++i) {
+        ssize_t written = write(fd, msg, strlen(msg));
+        if (written < 0) {
+            std::cerr << "Error writing to port: " << strerror(errno) << "\n";
+            break;
+        }
+        std::cout << "Sent: " << msg;
+
+        char buf[100];
+        ssize_t n = read(fd, buf, sizeof(buf) - 1);
+        if (n < 0) {
+            std::cerr << "Error reading from port: " << strerror(errno) << "\n";
+            break;
+        } else if (n == 0) {
+            std::cout << "No data received (timeout)\n";
+        } else {
+            buf[n] = '\0';
+            std::cout << "Received: " << buf;
+        }
+
+        sleep(1); // пауза 1 секунда между циклами
+    }
+
+    close(fd);
+    return 0;
+}
+Что здесь нового?
+Функция configurePort настраивает порт с таймаутом чтения 1 секунда.
+В цикле 5 раз отправляем строку "Ping\n" и пытаемся прочитать ответ.
+Если данных нет — выводим сообщение о таймауте.
+Между итерациями пауза 1 секунда.
+Если нужно — могу помочь с:
+
+Объяснением параметров termios.
+Примером с асинхронным чтением.
+Использованием C++ потоков или библиотек (например, Boost.Asio).
+Напишите, что интересно!
+
+
+
+
+
+
+
+
+да
+Понял, вы хотите продолжить и получить ещё более подробную помощь. Вот что я могу предложить дальше:
+
+1. Объяснение параметров termios
+cfsetospeed и cfsetispeed — задают скорость передачи (baud rate), например, B9600.
+c_cflag — основные флаги управления портом:
+CS8 — 8 бит данных.
+CLOCAL — игнорировать контроль модема.
+CREAD — включить приём.
+PARENB, PARODD — паритет (выключен).
+CSTOPB — количество стоп-битов (1).
+CRTSCTS — аппаратное управление потоком (выключено).
+c_iflag — входные флаги, например, отключение программного управления потоком (IXON, IXOFF).
+c_lflag — локальные флаги, например, отключение канонического режима (чтение посимвольно).
+c_cc[VMIN] и c_cc[VTIME] — минимальное количество символов для чтения и таймаут.
+2. Асинхронное чтение (пример с select)
+Если нужно не блокировать программу, можно использовать select для ожидания данных:
+
+cpp
+
+#include <sys/select.h>
+// ... внутри main после открытия и настройки порта
+
+fd_set readfds;
+struct timeval tv;
+int retval;
+
+FD_ZERO(&readfds);
+FD_SET(fd, &readfds);
+
+tv.tv_sec = 1;  // таймаут 1 секунда
+tv.tv_usec = 0;
+
+retval = select(fd + 1, &readfds, NULL, NULL, &tv);
+if (retval == -1) {
+    perror("select()");
+} else if (retval) {
+    char buf[100];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    if (n > 0) {
+        buf[n] = '\0';
+        std::cout << "Received: " << buf << "\n";
+    }
+} else {
+    std::cout << "Timeout, no data\n";
+}
+3. Использование Boost.Asio (если хотите C++ с удобным API)
+Boost.Asio позволяет работать с последовательными портами в стиле C++ с асинхронностью и исключениями. Если интересно, могу подготовить пример.
+
+Если хотите, скажите, что именно вам нужно — более подробный разбор, примеры с потоками, или помощь с конкретной задачей по COM-порту.
+
+
+
+
+
+
+
+
+да
+Понял, вы хотите пример с Boost.Asio для работы с COM-портом на macOS. Вот минимальный пример синхронного чтения и записи с использованием Boost.Asio:
+
+cpp
+
+#include <boost/asio.hpp>
+#include <iostream>
+
+int main() {
+    try {
+        boost::asio::io_context io;
+
+        // Замените на ваш порт, например "/dev/cu.usbserial-0001"
+        boost::asio::serial_port serial(io, "/dev/cu.usbserial-0001");
+
+        // Настройка порта
+        serial.set_option(boost::asio::serial_port_base::baud_rate(9600));
+        serial.set_option(boost::asio::serial_port_base::character_size(8));
+        serial.set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none));
+        serial.set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));
+        serial.set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none));
+
+        const std::string msg = "Ping\n";
+        boost::asio::write(serial, boost::asio::buffer(msg));
+
+        char buf[128];
+        size_t n = serial.read_some(boost::asio::buffer(buf));
+
+        std::cout << "Received: " << std::string(buf, n) << std::endl;
+    }
+    catch (std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+    }
+    return 0;
+}
+Как собрать
+Установите Boost (например, через Homebrew):
+bash
+
+brew install boost
+Скомпилируйте:
+bash
+
+g++ -std=c++17 -I/usr/local/include -L/usr/local/lib your_file.cpp -lboost_system -o serial_example
+(Путь к Boost может отличаться, проверьте brew info boost)
+
+Если нужно — могу помочь с асинхронным примером или с обработкой ошибок. Напишите!
+
+
+
+
+
+
+
+
+как подключить boost к проекту в clion
+Подключение Boost к проекту в CLion можно сделать несколькими способами. Ниже приведён пошаговый пример, как подключить Boost (в частности, Boost.Asio) с помощью CMake — стандартного инструмента сборки, который использует CLion.
+
+Шаг 1. Установите Boost
+Если Boost ещё не установлен, на macOS проще всего через Homebrew:
+
+bash
+
+brew install boost
+Шаг 2. Создайте или отредактируйте CMakeLists.txt
+Пример минимального CMakeLists.txt для проекта с Boost.Asio:
+
+cmake
+
+cmake_minimum_required(VERSION 3.15)
+project(SerialExample)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Найти Boost (только системная библиотека, т.к. Asio — header-only)
+find_package(Boost 1.70 REQUIRED COMPONENTS system)
+
+if(Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+else()
+    message(FATAL_ERROR "Boost not found")
+endif()
+
+add_executable(serial_example main.cpp)
+
+target_link_libraries(serial_example PRIVATE Boost::system)
+Шаг 3. Структура проекта
+
+/project_root
+  |-- CMakeLists.txt
+  |-- main.cpp
+В main.cpp — ваш код с использованием Boost.Asio.
+
+Шаг 4. Открыть проект в CLion
+Откройте папку с проектом в CLion.
+CLion автоматически запустит CMake и найдёт Boost.
+Если Boost не найден, проверьте переменную окружения BOOST_ROOT или укажите путь вручную.
+Шаг 5. Указание пути к Boost вручную (если нужно)
+Если Boost установлен не в стандартном месте, добавьте в CMakeLists.txt:
+
+cmake
+
+set(BOOST_ROOT "/usr/local/opt/boost")  # путь, где установлен Boost через Homebrew
+set(BOOST_INCLUDEDIR "${BOOST_ROOT}/include")
+set(BOOST_LIBRARYDIR "${BOOST_ROOT}/lib")
+
+find_package(Boost 1.70 REQUIRED COMPONENTS system)
+Дополнительно: Проверка в терминале
+Чтобы проверить, что Boost установлен и доступен:
+
+bash
+
+brew info boost
+Или:
+
+bash
+
+ls /usr/local/include/boost
+Если хотите, могу помочь с примером асинхронного кода или с настройкой под Windows/Linux. Просто скажите!
+
+
+
+
+
+
+
+
+Could not find a package configuration file provided by "boost_system"
+  (requested version 1.89.0) with any of the following names:
+
+    boost_systemConfig.cmake
+    boost_system-config.cmake
+
+  Add the installation prefix of "boost_system" to CMAKE_PREFIX_PATH or set
+  "boost_system_DIR" to a directory containing one of the above files.  If
+  "boost_system" provides a separate development package or SDK, be sure it
+  has been installed.
+Call Stack (most recent call first):
+  /opt/homebrew/lib/cmake/Boost-1.89.0/BoostConfig.cmake:262 (boost_find_component)
+  CMakeLists.txt:23 (find_package)
+Ошибка говорит, что CMake не может найти конфигурационные файлы для компонента boost_system. Это частая проблема при использовании Boost, установленного через Homebrew, потому что Boost в основном — header-only библиотека, а некоторые компоненты (включая boost_system) — это отдельные бинарные библиотеки, которые могут не иметь CMake-конфигов.
+
+Как решить проблему
+Вариант 1. Использовать Boost без find_package для header-only Asio и линковать вручную
+Boost.Asio (начиная с Boost 1.66) — header-only, но boost_system — это отдельная библиотека, которую нужно линковать.
+
+В CMakeLists.txt можно сделать так:
+
+cmake
+
+cmake_minimum_required(VERSION 3.15)
+project(SerialExample)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Указать путь к Boost вручную, если нужно
+set(BOOST_ROOT "/opt/homebrew/opt/boost")
+set(BOOST_INCLUDEDIR "${BOOST_ROOT}/include")
+set(BOOST_LIBRARYDIR "${BOOST_ROOT}/lib")
+
+include_directories(${BOOST_INCLUDEDIR})
+
+add_executable(serial_example main.cpp)
+
+# Линкуем системную библиотеку Boost вручную
+target_link_libraries(serial_example PRIVATE ${BOOST_LIBRARYDIR}/libboost_system.dylib)
+Проверьте, что файл libboost_system.dylib действительно есть в ${BOOST_LIBRARYDIR} (обычно /opt/homebrew/opt/boost/lib).
+
+Вариант 2. Использовать find_package(Boost COMPONENTS system) с указанием пути
+Попробуйте добавить в CMakeLists.txt:
+
+cmake
+
+set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/boost")
+find_package(Boost 1.89 REQUIRED COMPONENTS system)
+
+if(Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+    add_executable(serial_example main.cpp)
+    target_link_libraries(serial_example PRIVATE Boost::system)
+else()
+    message(FATAL_ERROR "Boost not found")
+endif()
+Или в настройках CLion (File → Settings → Build, Execution, Deployment → CMake) добавьте в поле CMake options:
+
+
+-D CMAKE_PREFIX_PATH=/opt/homebrew/opt/boost
+Вариант 3. Использовать pkg-config (если доступен)
+Проверьте, есть ли boost_system в pkg-config:
+
+bash
+
+pkg-config --cflags --libs boost_system
+Если да, то можно использовать pkg_check_modules в CMake.
+
+Итог
+Убедитесь, что Boost установлен через Homebrew:
+bash
+
+brew install boost
+Проверьте наличие файлов:
+bash
+
+ls /opt/homebrew/opt/boost/lib/libboost_system.*
+В CMakeLists.txt либо укажите путь в CMAKE_PREFIX_PATH, либо линкуйте библиотеку вручную.
+Если хотите, могу помочь составить точный CMakeLists.txt под вашу систему — просто пришлите вывод:
+
+bash
+
+ls -l /opt/homebrew/opt/boost/lib/libboost_system.*
+и содержимое вашего CMakeLists.txt.
+
+
+
+
+
+
+
+
+напиши еще раз максимально полный пример по работе с потами посредством POSIX API.. также подскажи как настроить для порта в macos
+Конечно! Ниже приведён максимально полный пример работы с последовательным портом (COM-портом) на macOS с использованием POSIX API. Также дам рекомендации по настройке порта.
+
+Работа с последовательным портом на macOS через POSIX API
+1. Пример кода на C++
+cpp
+
+#include <iostream>
+#include <fcntl.h>      // open
+#include <unistd.h>     // read, write, close
+#include <termios.h>    // терминальные настройки
+#include <cstring>      // memset
+#include <cerrno>       // errno
+
+// Функция для настройки последовательного порта
+bool configurePort(int fd, speed_t baudRate) {
+    struct termios tty;
+    memset(&tty, 0, sizeof tty);
+
+    if (tcgetattr(fd, &tty) != 0) {
+        std::cerr << "Error from tcgetattr: " << strerror(errno) << "\n";
+        return false;
+    }
+
+    // Установка скорости
+    cfsetospeed(&tty, baudRate);
+    cfsetispeed(&tty, baudRate);
+
+    // 8N1: 8 бит данных, без паритета, 1 стоп-бит
+    tty.c_cflag &= ~PARENB;        // без паритета
+    tty.c_cflag &= ~CSTOPB;        // 1 стоп-бит
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;            // 8 бит данных
+
+    tty.c_cflag &= ~CRTSCTS;       // без аппаратного управления потоком
+    tty.c_cflag |= CREAD | CLOCAL; // включить прием и игнорировать контроль модема
+
+    // Режимы ввода
+    tty.c_lflag &= ~ICANON;        // отключить канонический режим
+    tty.c_lflag &= ~ECHO;          // отключить эхо
+    tty.c_lflag &= ~ECHOE;         // отключить эхо erase
+    tty.c_lflag &= ~ISIG;          // отключить сигналы
+
+    // Режимы вывода
+    tty.c_oflag &= ~OPOST;         // отключить постобработку вывода
+
+    // Режимы ввода (программные)
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // отключить программное управление потоком
+    tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
+
+    // Таймауты чтения
+    tty.c_cc[VMIN] = 0;    // минимальное количество символов для чтения
+    tty.c_cc[VTIME] = 10;  // таймаут в десятых долях секунды (1 секунда)
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        std::cerr << "Error from tcsetattr: " << strerror(errno) << "\n";
+        return false;
+    }
+
+    return true;
+}
+
+int main() {
+    // Путь к последовательному порту (замените на ваш)
+    const char* portName = "/dev/cu.usbserial-0001";
+
+    // Открываем порт
+    int fd = open(portName, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0) {
+        std::cerr << "Error opening " << portName << ": " << strerror(errno) << "\n";
+        return 1;
+    }
+
+    // Настраиваем порт на 9600 бод
+    if (!configurePort(fd, B9600)) {
+        close(fd);
+        return 1;
+    }
+
+    // Переключаем порт в блокирующий режим для чтения
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+
+    // Пример записи
+    const char* msg = "Hello, serial port!\n";
+    ssize_t bytes_written = write(fd, msg, strlen(msg));
+    if (bytes_written < 0) {
+        std::cerr << "Write error: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    }
+    std::cout << "Wrote " << bytes_written << " bytes\n";
+
+    // Пример чтения
+    char buf[100];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    if (n < 0) {
+        std::cerr << "Read error: " << strerror(errno) << "\n";
+        close(fd);
+        return 1;
+    } else if (n == 0) {
+        std::cout << "No data read (timeout)\n";
+    } else {
+        buf[n] = '\0';
+        std::cout << "Read " << n << " bytes: " << buf << "\n";
+    }
+
+    close(fd);
+    return 0;
+}
+2. Объяснение и рекомендации
+Путь к порту:
+На macOS последовательные порты обычно находятся в /dev/cu.* или /dev/tty.*.
+
+/dev/cu.* — для "call-up" устройств, обычно лучше для приложений.
+/dev/tty.* — для "dial-in" устройств.
+Используйте ls /dev/cu.* чтобы увидеть доступные порты.
+Параметры скорости:
+В configurePort можно заменить B9600 на другие скорости, например:
+
+B115200 — 115200 бод
+B19200 — 19200 бод
+и т.д. (см. man termios)
+Настройка таймаутов:
+VMIN и VTIME управляют поведением чтения:
+
+VMIN=0 и VTIME=10 — чтение вернётся либо при получении данных, либо через 1 секунду таймаута.
+Флаги открытия:
+
+O_NOCTTY — не делать этот порт управляющим терминалом процесса.
+O_NONBLOCK — открыть в неблокирующем режиме, потом переключаем обратно.
+Права доступа:
+Убедитесь, что у вас есть права на чтение/запись порта. Если нет, можно запустить программу с sudo или изменить права на устройство.
+
+3. Как узнать имя порта на macOS
+В терминале выполните:
+
+bash
+
+ls /dev/cu.*
+Пример вывода:
+
+
+/dev/cu.Bluetooth-Incoming-Port
+/dev/cu.usbserial-0001
+Используйте нужный вам порт.
+
+4. Компиляция
+bash
+
+g++ -std=c++17 -o serial_example serial_example.cpp
+Если нужно — могу помочь с асинхронным чтением/записью, обработкой ошибок или с примером на C. Просто скажите!
+
+
+
+
+
+
+
+
+да
+Отлично! Вот расширенный пример работы с последовательным портом на macOS с использованием POSIX API, включая асинхронное чтение и запись, а также подробные комментарии и рекомендации.
+
+Полный пример работы с последовательным портом (POSIX API, macOS)
+cpp
+
+#include <iostream>
+#include <fcntl.h>      // open, fcntl
+#include <unistd.h>     // read, write, close
+#include <termios.h>    // настройки терминала
+#include <cstring>      // memset, strerror
+#include <cerrno>       // errno
+#include <csignal>      // signal handling
+#include <thread>
+#include <atomic>
+
+// Глобальная переменная для остановки цикла чтения
+std::atomic<bool> keepRunning(true);
+
+// Обработчик сигнала для корректного завершения
+void signalHandler(int signum) {
+    std::cout << "\nSignal (" << signum << ") received, stopping...\n";
+    keepRunning = false;
+}
+
+// Функция настройки последовательного порта
+bool configurePort(int fd, speed_t baudRate) {
+    struct termios tty;
+    memset(&tty, 0, sizeof tty);
+
+    if (tcgetattr(fd, &tty) != 0) {
+        std::cerr << "Error from tcgetattr: " << strerror(errno) << "\n";
+        return false;
+    }
+
+    // Установка скорости
+    cfsetospeed(&tty, baudRate);
+    cfsetispeed(&tty, baudRate);
+
+    // 8N1: 8 бит данных, без паритета, 1 стоп-бит
+    tty.c_cflag &= ~PARENB;        // без паритета
+    tty.c_cflag &= ~CSTOPB;        // 1 стоп-бит
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;            // 8 бит данных
+
+    tty.c_cflag &= ~CRTSCTS;       // без аппаратного управления потоком
+    tty.c_cflag |= CREAD | CLOCAL; // включить прием и игнорировать контроль модема
+
+    // Режимы ввода
+    tty.c_lflag &= ~ICANON;        // отключить канонический режим
+    tty.c_lflag &= ~ECHO;          // отключить эхо
+    tty.c_lflag &= ~ECHOE;         // отключить эхо erase
+    tty.c_lflag &= ~ISIG;          // отключить сигналы
+
+    // Режимы вывода
+    tty.c_oflag &= ~OPOST;         // отключить постобработку вывода
+
+    // Режимы ввода (программные)
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // отключить программное управление потоком
+    tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
+
+    // Таймауты чтения
+    tty.c_cc[VMIN] = 0;    // минимальное количество символов для чтения
+    tty.c_cc[VTIME] = 10;  // таймаут в десятых долях секунды (1 секунда)
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        std::cerr << "Error from tcsetattr: " << strerror(errno) << "\n";
+        return false;
+    }
+
+    return true;
+}
+
+// Функция для асинхронного чтения из порта
+void readThreadFunc(int fd) {
+    char buf[256];
+    while (keepRunning) {
+        ssize_t n = read(fd, buf, sizeof(buf) - 1);
+        if (n < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Нет данных, можно подождать
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            } else {
+                std::cerr << "Read error: " << strerror(errno) << "\n";
+                break;
+            }
+        } else if (n == 0) {
+            // Таймаут чтения
+            continue;
+        } else {
+            buf[n] = '\0';
+            std::cout << "Received: " << buf << std::flush;
+        }
+    }
+}
+
+int main() {
+    // Установка обработчика сигнала для Ctrl+C
+    signal(SIGINT, signalHandler);
+
+    // Путь к последовательному порту (замените на ваш)
+    const char* portName = "/dev/cu.usbserial-0001";
+
+    // Открываем порт в неблокирующем режиме
+    int fd = open(portName, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0) {
+        std::cerr << "Error opening " << portName << ": " << strerror(errno) << "\n";
+        return 1;
+    }
+
+    // Настраиваем порт на 115200 бод
+    if (!configurePort(fd, B115200)) {
+        close(fd);
+        return 1;
+    }
+
+    // Переключаем порт в блокирующий режим для чтения
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+
+    // Запускаем поток для чтения данных
+    std::thread reader(readThreadFunc, fd);
+
+    // Основной поток — запись данных с консоли в порт
+    std::string input;
+    std::cout << "Enter text to send (Ctrl+C to quit):\n";
+    while (keepRunning && std::getline(std::cin, input)) {
+        input += "\n"; // добавляем перевод строки
+        ssize_t written = write(fd, input.c_str(), input.size());
+        if (written < 0) {
+            std::cerr << "Write error: " << strerror(errno) << "\n";
+            break;
+        }
+    }
+
+    // Ожидаем завершения потока чтения
+    keepRunning = false;
+    reader.join();
+
+    close(fd);
+    std::cout << "Serial port closed.\n";
+    return 0;
+}
+Как использовать и настроить
+1. Найдите имя порта
+В терминале:
+
+bash
+
+ls /dev/cu.*
+Выберите нужный порт, например /dev/cu.usbserial-0001.
+
+2. Права доступа
+Если при открытии порта возникает ошибка доступа, попробуйте:
+
+Запустить программу с sudo
+Или изменить права на устройство (например, chmod), но это временно.
+3. Компиляция
+bash
+
+g++ -std=c++17 -pthread -o serial_async serial_async.cpp
+4. Запуск
+bash
+
+./serial_async
+Введите текст — он отправится в последовательный порт. При получении данных с порта они будут выводиться в консоль.
+
+Ключевые моменты
+Используется termios для настройки скорости, формата данных, управления потоком.
+Порт открывается в неблокирующем режиме, потом переключается в блокирующий для удобства.
+Чтение происходит в отдельном потоке, чтобы не блокировать основной поток.
+Обработка сигнала SIGINT (Ctrl+C) для корректного завершения.
+Таймауты чтения настроены через VMIN и VTIME.
+Если нужно, могу помочь с:
+
+Объяснением параметров termios
+Примером на C
+Использованием select/poll для мультиплексирования ввода-вывода
+Интеграцией с Boost.Asio или другими библиотеками
+Просто скажите!
+
+
+
+
+
+
+
+
+Объяснением параметров termios
+Конечно! Вот подробное объяснение основных параметров структуры termios, которые используются для настройки последовательного порта в POSIX-системах (включая macOS).
+
+Структура termios
+termios — это структура, которая описывает настройки терминала (в том числе последовательного порта). Она определена в <termios.h> и содержит несколько полей, управляющих режимами ввода-вывода.
+
+Основные поля:
+
+c_cflag — флаги управления устройством (baud rate, биты данных, паритет, стоп-биты и т.д.)
+c_iflag — флаги входных данных (обработка специальных символов, управление потоком)
+c_oflag — флаги выходных данных (обработка вывода)
+c_lflag — локальные флаги (режимы канонического ввода, эхо и т.п.)
+c_cc[] — управляющие символы (таймауты, специальные символы)
+Подробное объяснение параметров
+1. c_cflag — управление устройством
+CSIZE — маска для выбора количества бит данных (обычно 5, 6, 7 или 8 бит)
+CS5, CS6, CS7, CS8 — конкретное количество бит данных
+CSTOPB — если установлен, используется 2 стоп-бита, иначе 1 стоп-бит
+PARENB — включить проверку паритета
+PARODD — если установлен, используется нечетный паритет, иначе четный
+CRTSCTS — аппаратное управление потоком (RTS/CTS)
+CREAD — разрешить прием данных
+CLOCAL — игнорировать контроль модема (не ждать сигналов DCD и т.п.)
+Пример:
+
+cpp
+
+tty.c_cflag &= ~PARENB;  // отключить паритет
+tty.c_cflag &= ~CSTOPB;  // 1 стоп-бит
+tty.c_cflag &= ~CSIZE;   // очистить биты размера
+tty.c_cflag |= CS8;      // 8 бит данных
+tty.c_cflag |= CREAD | CLOCAL; // включить прием и игнорировать контроль модема
+2. c_iflag — входные флаги
+IXON, IXOFF, IXANY — программное управление потоком (XON/XOFF)
+IGNBRK — игнорировать сигнал прерывания (break)
+BRKINT — прерывать при получении break
+PARMRK — помечать ошибки паритета
+ISTRIP — обрезать старший бит (оставлять 7 бит)
+INLCR — преобразовывать символ LF в CR при вводе
+IGNCR — игнорировать CR
+ICRNL — преобразовывать CR в LF
+Пример:
+
+cpp
+
+tty.c_iflag &= ~(IXON | IXOFF | IXANY); // отключить программное управление потоком
+tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
+3. c_oflag — выходные флаги
+OPOST — включить постобработку вывода (например, преобразование LF в CR+LF)
+Пример:
+
+cpp
+
+tty.c_oflag &= ~OPOST; // отключить постобработку вывода
+4. c_lflag — локальные флаги
+ICANON — канонический режим (ввод построчный, с редактированием)
+ECHO — включить эхо вводимых символов
+ECHOE — эхо символа erase (backspace)
+ISIG — включить обработку сигналов (Ctrl+C, Ctrl+Z)
+NOFLSH — не сбрасывать буферы при сигнале
+IEXTEN — расширенные функции (например, Ctrl+V)
+Пример:
+
+cpp
+
+tty.c_lflag &= ~ICANON; // отключить канонический режим (чтение посимвольно)
+tty.c_lflag &= ~ECHO;   // отключить эхо
+tty.c_lflag &= ~ECHOE;  // отключить эхо erase
+tty.c_lflag &= ~ISIG;   // отключить сигналы
+5. c_cc[] — управляющие символы
+Массив управляющих символов, индексируемый константами:
+
+VMIN — минимальное количество символов для чтения
+VTIME — таймаут чтения в десятых долях секунды
+VINTR — символ прерывания (обычно Ctrl+C)
+VQUIT — символ выхода
+VERASE — символ удаления (backspace)
+VKILL — символ удаления строки
+и другие
+Пример:
+
+cpp
+
+tty.c_cc[VMIN] = 0;    // минимальное количество символов для чтения
+tty.c_cc[VTIME] = 10;  // таймаут 1 секунда (10 * 0.1 с)
+Как это работает вместе?
+Если ICANON выключен, ввод происходит посимвольно, без ожидания Enter.
+VMIN и VTIME управляют блокировкой чтения:
+VMIN=0 и VTIME>0 — чтение вернется либо при получении хотя бы одного символа, либо по таймауту.
+c_cflag задаёт физические параметры линии (скорость, биты, паритет).
+c_iflag и c_oflag управляют преобразованием символов и потоком.
+c_lflag управляет поведением терминала (эхо, сигналы, канонический режим).
+Резюме
+Параметр	Назначение	Пример использования
+c_cflag	Настройка скорости, бит данных, паритета	CS8, CLOCAL, CREAD
+c_iflag	Входные преобразования и управление потоком	Отключение IXON для отключения XON/XOFF
+c_oflag	Выходные преобразования	Отключение OPOST для "сырых" данных
+c_lflag	Локальные режимы (канонический ввод, эхо)	Отключение ICANON для посимвольного ввода
+c_cc[]	Таймауты и специальные символы	VMIN, VTIME для управления чтением
+Если хотите, могу помочь с конкретными примерами настройки под ваши задачи или объяснить, как выбрать скорость передачи (baud rate) и другие параметры. Просто скажите!
+
+
+
+
+
+
+
+
+как настроить связь двух портов в macos
+Настроить связь между двумя последовательными портами в macOS можно несколькими способами, в зависимости от того, что именно вы хотите сделать:
+
+Варианты задачи
+Соединить два физических последовательных порта (например, через null-modem кабель)
+Создать виртуальные последовательные порты и связать их программно (например, для тестирования)
+Программно читать из одного порта и писать в другой (мост между портами)
+1. Физическое соединение двух портов
+Если у вас есть два физических последовательных порта (например, USB-to-serial адаптеры), то для их связи обычно используют null-modem кабель — он перекрещивает линии передачи и приема, позволяя устройствам обмениваться данными.
+
+После подключения:
+
+Определите имена устройств, например /dev/cu.usbserial-XXXX и /dev/cu.usbserial-YYYY
+Настройте параметры портов (скорость, биты, паритет) одинаково с помощью termios (см. ниже)
+Запустите программу, которая читает данные из одного порта и пишет в другой, и наоборот
+2. Создание виртуальных последовательных портов (PTY)
+Для тестирования или разработки можно создать пару связанных виртуальных последовательных портов (pseudo-terminals), которые будут связаны друг с другом.
+
+В macOS можно использовать socat — утилиту для создания виртуальных последовательных портов.
+
+Пример:
+bash
+
+socat -d -d pty,raw,echo=0 pty,raw,echo=0
+Вывод будет примерно такой:
+
+
+2025/09/07 13:00:00 socat[12345] N PTY is /dev/ttys001
+2025/09/07 13:00:00 socat[12345] N PTY is /dev/ttys002
+Теперь /dev/ttys001 и /dev/ttys002 — это два связанных виртуальных порта. Запустив в одном терминале программу, которая читает и пишет в /dev/ttys001, а в другом — в /dev/ttys002, вы получите связь между ними.
+
+3. Программный мост между двумя портами
+Если у вас есть два порта (физических или виртуальных), и вы хотите связать их программно, то нужно:
+
+Открыть оба порта с помощью open()
+Настроить параметры с помощью termios (скорость, биты, паритет, режимы)
+В цикле читать данные из одного порта и писать в другой, и наоборот
+Пример на C (упрощённо):
+c
+
+int fd1 = open("/dev/cu.usbserial-XXXX", O_RDWR | O_NOCTTY);
+int fd2 = open("/dev/cu.usbserial-YYYY", O_RDWR | O_NOCTTY);
+
+// Настройка fd1 и fd2 через termios (скорость, 8N1, без эха и т.п.)
+
+while (1) {
+    char buf[256];
+    ssize_t n;
+
+    // Читаем из fd1 и пишем в fd2
+    n = read(fd1, buf, sizeof(buf));
+    if (n > 0) write(fd2, buf, n);
+
+    // Читаем из fd2 и пишем в fd1
+    n = read(fd2, buf, sizeof(buf));
+    if (n > 0) write(fd1, buf, n);
+}
+Настройка параметров порта через termios
+Пример настройки скорости 115200, 8 бит, без паритета, 1 стоп-бит, без эха:
+
+c
+
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+
+int configure_port(int fd) {
+    struct termios tty;
+    if (tcgetattr(fd, &tty) != 0) {
+        perror("tcgetattr");
+        return -1;
+    }
+
+    cfsetospeed(&tty, B115200);
+    cfsetispeed(&tty, B115200);
+
+    tty.c_cflag &= ~PARENB; // без паритета
+    tty.c_cflag &= ~CSTOPB; // 1 стоп-бит
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;     // 8 бит
+    tty.c_cflag |= CREAD | CLOCAL; // включить прием, игнорировать контроль модема
+
+    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // raw режим
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // отключить программное управление потоком
+    tty.c_oflag &= ~OPOST; // raw вывод
+
+    tty.c_cc[VMIN] = 1;  // читать по одному символу
+    tty.c_cc[VTIME] = 0; // без таймаута
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        perror("tcsetattr");
+        return -1;
+    }
+    return 0;
+}
+Итог
+Для физической связи — используйте null-modem кабель и настройте порты одинаково.
+Для виртуальной связи — используйте socat для создания пары связанных виртуальных портов.
+Для программной связи — напишите программу, которая читает из одного порта и пишет в другой.
