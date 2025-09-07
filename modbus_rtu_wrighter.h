@@ -7,7 +7,6 @@
 
 #include <string>
 #include <vector>
-#include <cstdint>
 #include <termios.h> // Для speed_t
 
 // Функция вычисления CRC16 Modbus
@@ -32,7 +31,7 @@ private:
     void configurePort(speed_t baudRate) const;
 
     // Обработка завершённого пакета
-    static void createPackets(const std::vector<uint8_t>& packet);
+    static void createPacket(uint8_t *packet);
 };
 
 #endif // MODBUS_RTU_READER_H
