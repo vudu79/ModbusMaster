@@ -57,11 +57,10 @@ void ModbusRTUWrighter::wrightLoop() const {
 
         // Отправляем пакет в порт 1
         ssize_t w = write(fd, packet, 8);
+
         if (w != 8) {
             perror("write");
             break;
-
-
         }
         printf("Пакет размером %ld отправлен в порт 1\n" , w);
     }

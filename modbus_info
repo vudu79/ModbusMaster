@@ -1,0 +1,98 @@
+
+Основные функции Modbus с их номерами и описанием
+Функция	Код	Что делает
+Read Coils	01 (0x01)	Чтение значений дискретных выходов (Coils)
+Read Discrete Inputs	02 (0x02)	Чтение значений дискретных входов
+Read Holding Registers	03 (0x03)	Чтение значений регистров хранения (HOLDING REG)
+Read Input Registers	04 (0x04)	Чтение значений регистров ввода (INPUT REG)
+Write Single Coil	05 (0x05)	Запись в один дискретный выход (Coil)
+Write Single Register	06 (0x06)	Запись одного регистра хранения
+Write Multiple Coils	15 (0x0F)	Запись нескольких дискретных выходов (Coils)
+Write Multiple Registers	16 (0x10)	Запись нескольких регистров хранения
+(Другие менее распространённые смотрите ниже)
+
+Структура пакетов Modbus RTU / TCP
+Общие поля запроса:
+
+Адрес устройства (1 байт) — RTU
+Функция (1 байт) — указывает тип операции
+Данные (переменная длина) — в зависимости от функции
+CRC (2 байта в RTU) / TCP заголовок вместо CRC
+
+Функция 01 (0x01): Read Coils — Чтение дискретных выходов
+Запрос
+Поле	Размер (байты)	Описание
+Slave Address	1	Адрес устройства
+Function Code	1	0x01
+Starting Address	2	Адрес первого бита (coil)
+Quantity of Coils	2	Кол-во бит для чтения
+CRC	2	Контрольная сумма
+Ответ
+Поле	Размер	Описание
+Slave Address	1	Адрес
+Function Code	1	0x01
+Byte Count	1	Кол-во байт с битами (coil)
+Coil Status	N	Значения дискретных выходов
+CRC	2	Контрольная сумма
+
+Функция 03 (0x03): Read Holding Registers — Чтение регистров хранения
+Запрос
+Поле	Размер	Описание
+Slave Address	1	Адрес
+Function Code	1	0x03
+Starting Address	2	Адрес первого регистра
+Quantity of Reg	2	Кол-во регистров
+CRC	2	Контрольная сумма
+Ответ
+Поле	Размер	Описание
+Slave Address	1	Адрес
+Function Code	1	0x03
+Byte Count	1	Кол-во байт (2 * Quantity регистра)
+Register Data	N	Значения регистров
+CRC	2	Контрольная сумма
+
+Функция 05 (0x05): Write Single Coil — Запись одного дискретного выхода
+Запрос и ответ (идентичны)
+Поле	Размер	Описание
+Slave Address	1	Адрес
+Function Code	1	0x05
+Output Address	2	Адрес дискретного выхода
+Output Value	2	0xFF00 — вкл, 0x0000 — выкл
+CRC	2	Контрольная сумма
+
+Функция 16 (0x10): Write Multiple Registers — Запись нескольких регистров
+Запрос
+Поле	Размер	Описание
+Slave Address	1	Адрес
+Function Code	1	0x10
+Starting Address	2	Адрес начала записи
+Quantity of Reg	2	Кол-во регистров
+Byte Count	1	Кол-во байт данных (2 * Quantity)
+Registers Value	N (2*Quantity)	Значения регистров
+CRC	2	Контрольная сумма
+Ответ
+Поле	Размер	Описание
+Slave Address	1	Адрес
+Function Code	1	0x10
+Starting Address	2	Адрес начала записи
+Quantity of Reg	2	Кол-во регистров
+CRC	2	Контрольная сумма
+Сводка большинства распространённых функций Modbus
+Код	Описание
+01 (0x01)	Read Coils
+02 (0x02)	Read Discrete Inputs
+03 (0x03)	Read Holding Registers
+04 (0x04)	Read Input Registers
+05 (0x05)	Write Single Coil
+06 (0x06)	Write Single Register
+15 (0x0F)	Write Multiple Coils
+16 (0x10)	Write Multiple Registers
+Другие функции
+07 (0x07) — Read Exception Status
+08 (0x08) — Diagnostics
+20 (0x14) — Read File Record
+21 (0x15) — Write File Record
+23 (0x17) — Read/Write Multiple Registers
+24 (0x18) — Mask Write Register
+Они встречаются реже и имеют более сложный формат.
+
