@@ -1,4 +1,5 @@
 #include "modbus_rtu_wrighter.h"
+#include "serial_port_util.h"
 
 #include <iostream>     // Для вывода в консоль
 #include <vector>       // Для динамического массива байт (буфера)
@@ -9,7 +10,6 @@
 #include <cstring>      // Для strerror
 #include <stdexcept>    // Для исключений
 
-#include "serial_port_util.h"
 
 // Функция вычисления CRC16 Modbus
 uint16_t crc16_modbus(const uint8_t *data, size_t length) {

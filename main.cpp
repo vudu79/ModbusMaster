@@ -1,21 +1,21 @@
-#include <QApplication>
 #include <QPushButton>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 
-#include <cstdio>
 #include <cstdlib>
 #include <unistd.h>
-#include <fcntl.h>
 #include <iostream>
 #include <termios.h>
 #include <sys/select.h>
 
 #include "modbus_rtu_wrighter.h"
 #include "serial_port_util.h"
- // с print_buffer и configure_port
 
 #define BUF_SIZE 256
+
+
+// В терминале запускаем для виртуальных порта и соединяем их
+// ➜  ~ socat -d -d pty,raw,echo=0 pty,raw,echo=0
 
 int main(int argc, char *argv[]) {
     QGuiApplication application(argc, argv);
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
     }
 
     try {
-        const ModbusRTUWrighter writer("/dev/ttys006", B9600);
+        const ModbusRTUWrighter writer("/dev/ttys001", B9600);
         writer.wrightLoop();
     }
     catch (const std::exception& ex) {
