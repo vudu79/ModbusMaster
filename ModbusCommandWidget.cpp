@@ -8,7 +8,6 @@
 #include <QComboBox>          // Виджет выпадающего списка
 #include <QPushButton>        // Кнопка
 #include <QVBoxLayout>        // Вертикальный менеджер компоновки
-#include <QHBoxLayout>        // Горизонтальный менеджер компоновки
 #include <QTextEdit>          // Многострочное текстовое поле
 
 
@@ -232,9 +231,6 @@ void ModbusCommandWidget::buildCommand() const {
         default: {
         }
     }
-
-
-
 
     // В конце - CRC
     quint16 crc = crc16(*cmd);

@@ -21,7 +21,7 @@
 
 
 
-// 1. Потокобезопасная очередь
+//  Потокобезопасная очередь
 template<typename T>
 class ThreadSafeQueue {
 public:
@@ -102,7 +102,7 @@ private:
 };
 
 
-// 2. Поток для работы с портом (POSIX API)
+//  Поток для работы с портом (POSIX API)
 class SerialPort {
 public:
     SerialPort(const char *device) : m_device(device), m_fd(-1), m_running(false) {}
@@ -162,7 +162,7 @@ private:
 };
 
 
-//3. Поток обработки порта (чтение-запись)
+// Поток обработки порта (чтение-запись)
 class SerialThread {
 public:
     SerialThread(const char *device,

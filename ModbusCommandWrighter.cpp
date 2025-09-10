@@ -38,15 +38,6 @@ ModbusMasterProcessor::ModbusMasterProcessor(const char *device, speed_t baudRat
     serialThread = new SerialThread(device, *outQueue, *inQueue);
     serialThread->start();
     read_thread = std::thread(&ModbusMasterProcessor::readLoop, this);
-
-
-    // this->fd = -1;
-    // fd = open(device.c_str(), O_RDWR | O_NOCTTY | O_SYNC); // Открываем порт
-    // if (fd < 0) {
-    //     // Если не удалось открыть, выбрасываем исключение с сообщением
-    //     throw std::runtime_error("Не удалось открыть порт " + device + ": " + strerror(errno));
-    // }
-    // configurePort(baudRate); // Настраиваем параметры порта
 }
 
 // Деструктор: закрывает порт при уничтожении объекта
@@ -55,6 +46,73 @@ ModbusMasterProcessor::~ModbusMasterProcessor() {
     serialThread->stop();
     if (read_thread.joinable()) read_thread.join();
 }
+
+
+void ModbusMasterProcessor::readLoop() {
+    std::vector<uint8_t> data;
+    while (1) {
+        while (inQueue->try_dequeue(data)) {
+            checkRequestADU(data);
+        }
+    }
+}
+
+// Обработка завершённого пакета
+void ModbusMasterProcessor::checkRequestADU(std::vector<uint8_t> &packet) {
+    // Проверяем минимальный размер (5 байт)
+    if (packet.size() >= 5) {
+        quint8 slaveAddress = static_cast<quint8>(packet.at(0));
+        quint8 functionCode = static_cast<quint8>(packet.at(1));
+
+        if (functionCode & 0x80) {
+            // Ошибочный ответ
+            quint8 exceptionCode = static_cast<quint8>(packet.at(2));
+            qDebug() << "Ошибка от ведомого. Код исключения:" << QString::number(exceptionCode, 16);
+        } else {
+            // Нормальный ответ
+        }
+    } else {
+        qDebug() << "Ответ короткий, возможно неверный или повреждён";
+    }
+
+    // Вычисляем CRC по всем байтам, кроме последних двух (CRC в конце)
+    uint16_t crcCalc = crc16_modbus(packet.data(), packet.size() - 2);
+    // Извлекаем CRC из пакета (младший байт + старший байт)
+    uint16_t crcPacket = packet[packet.size() - 2] | (packet[packet.size() - 1] << 8);
+
+    if (crcCalc != crcPacket) {
+        std::cerr << "Ошибка CRC, пакет отброшен" << std::endl;
+        return;
+    }
+
+    // Если CRC верен — выводим пакет в консоль
+    std::cout << "Получен корректный пакет ADU: ";
+    for (auto b: packet) {
+        printf("%02X ", b);
+    }
+    std::cout << std::endl;
+
+    emit dataReceived(packet);
+}
+
+void ModbusMasterProcessor::printHEXPacket(std::vector<uint8_t> &packet) const {
+    uint8_t functionNumber = packet[1];
+    uint8_t slaveNumber = packet[0];
+    if (functionNumber & 0x80) {
+        printf("Пакет с кодом ошибки на команду № %d от устройства № %d сформирован: ", functionNumber, slaveNumber);
+    }
+    printf("Ответный пакет на команду № %d от устройства № %d сформирован: ", functionNumber, slaveNumber);
+    for (auto b: packet) {
+        printf("%02X ", b);
+    }
+    std::cout << std::endl;
+}
+
+
+
+
+
+
 
 // Основной цикл для формирования пакета и отправки в порт (консоль)
 void ModbusMasterProcessor::wrightLoop() const {
@@ -177,16 +235,6 @@ void ModbusMasterProcessor::sendFrame(const QByteArray &data) const {
 }
 
 
-void ModbusMasterProcessor::readLoop() {
-    std::vector<uint8_t> data;
-    while (1) {
-        while (inQueue->try_dequeue(data)) {
-            checkRequestADU(data);
-        }
-    }
-}
-
-
 // Основной цикл чтения данных из порта (консоль)
 // void ModbusMasterProcessor::readLoop() {
 // std::vector<uint8_t> buffer; // Буфер для накопления байт пакета
@@ -233,56 +281,3 @@ void ModbusMasterProcessor::readLoop() {
 // }
 // }
 
-// Обработка завершённого пакета
-void ModbusMasterProcessor::checkRequestADU(std::vector<uint8_t> &packet) {
-    // Проверяем минимальный размер (5 байт)
-    if (packet.size() >= 5) {
-        quint8 slaveAddress = static_cast<quint8>(packet.at(0));
-        quint8 functionCode = static_cast<quint8>(packet.at(1));
-
-        if (functionCode & 0x80) {
-            // Ошибочный ответ
-            quint8 exceptionCode = static_cast<quint8>(packet.at(2));
-            qDebug() << "Ошибка от ведомого. Код исключения:" << QString::number(exceptionCode, 16);
-        } else {
-            // Нормальный ответ
-        }
-    } else {
-        qDebug() << "Ответ короткий, возможно неверный или повреждён";
-    }
-
-    // Вычисляем CRC по всем байтам, кроме последних двух (CRC в конце)
-    uint16_t crcCalc = crc16_modbus(packet.data(), packet.size() - 2);
-    // Извлекаем CRC из пакета (младший байт + старший байт)
-    uint16_t crcPacket = packet[packet.size() - 2] | (packet[packet.size() - 1] << 8);
-
-    if (crcCalc != crcPacket) {
-        std::cerr << "Ошибка CRC, пакет отброшен" << std::endl;
-        return;
-    }
-
-    // Если CRC верен — выводим пакет в консоль
-    std::cout << "Получен корректный пакет ADU: ";
-    for (auto b: packet) {
-        printf("%02X ", b);
-    }
-    std::cout << std::endl;
-
-    emit dataReceived(packet);
-
-    // QString str = QString::fromStdString(std::string(packet.begin(), packet.end()));
-    // ui->textEdit->append(str);
-}
-
-void ModbusMasterProcessor::printHEXPacket(std::vector<uint8_t> &packet) const {
-    uint8_t functionNumber = packet[1];
-    uint8_t slaveNumber = packet[0];
-    if (functionNumber & 0x80) {
-        printf("Пакет с кодом ошибки на команду № %d от устройства № %d сформирован: ", functionNumber, slaveNumber);
-    }
-    printf("Ответный пакет на команду № %d от устройства № %d сформирован: ", functionNumber, slaveNumber);
-    for (auto b: packet) {
-        printf("%02X ", b);
-    }
-    std::cout << std::endl;
-}

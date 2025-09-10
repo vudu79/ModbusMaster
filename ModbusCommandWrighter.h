@@ -77,7 +77,6 @@ private:
     SerialThread *serialThread;
     std::thread read_thread;
 
-
     // Настройка параметров порта
     void configurePort(speed_t baudRate) const;
 
@@ -85,6 +84,7 @@ private:
     static void createPacket(uint8_t *packet);
 
 signals:
+    // сигнал который процессор отправляет по получению данных из очереди
     void dataReceived(std::vector<uint8_t> data);
 
 public slots:

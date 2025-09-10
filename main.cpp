@@ -55,39 +55,3 @@ int main(int argc, char *argv[]) {
 
 
 
-
-// UI QML
-// int main(int argc, char *argv[])
-// {
-//     QGuiApplication app(argc, argv);
-//
-//     qmlRegisterType<ModbusCommandBuilder>("Modbus", 1, 0, "ModbusCommandBuilder");
-//
-//     QQmlApplicationEngine engine;
-//     engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
-//     if (engine.rootObjects().isEmpty())
-//         return -1;
-//
-//     return app.exec();
-// }
-
-
-// int main(int argc, char *argv[]) {
-//     QGuiApplication application(argc, argv);
-//     QQmlApplicationEngine engine;
-//
-//     engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
-//     if (engine.rootObjects().isEmpty()) {
-//         return -1;
-//     }
-//     return QGuiApplication::exec();
-//
-//     try {
-//         const ModbusMasterProcessor writer("/dev/ttys003", B9600);
-//         writer.wrightLoop();
-//     }
-//     catch (const std::exception& ex) {
-//         std::cerr << "Ошибка: " << ex.what() << std::endl;
-//         return 1;
-//     }
-// }

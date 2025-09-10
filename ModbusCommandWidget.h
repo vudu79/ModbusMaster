@@ -40,8 +40,6 @@ public slots:
 
 public slots:
 
-
-
 public:
     QPushButton *sendButton;
 
