@@ -15,8 +15,6 @@ find_package(Qt6 COMPONENTS
         Gui
         Widgets
         REQUIRED)
-find_package(Qt6 REQUIRED COMPONENTS Qml)
-find_package(Qt6 COMPONENTS Core Quick Qml REQUIRED)
 qt_standard_project_setup()
 
 
@@ -25,13 +23,15 @@ add_executable(ModbusMaster main.cpp
         main.cpp
         serial_port_util.h
         serial_port_util.cpp
-        modbus_rtu_wrighter.h
-        modbus_rtu_wrighter.cpp)
+        ModbusCommandWrighter.h
+        ModbusCommandWrighter.cpp
+        ModbusCommandWidget.cpp
+        ModbusCommandWidget.h
+        SerialThread.h)
 target_link_libraries(ModbusMaster
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
-        Qt6::Qml
 )
 qt6_add_resources(RESOURCES qml.qrc)
 target_sources(ModbusMaster PRIVATE ${RESOURCES})
