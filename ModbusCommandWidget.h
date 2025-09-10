@@ -6,7 +6,6 @@
 #define UNTITLED_MODBUSCOMMANDWIDGET_H
 
 
-
 #include <QApplication>       // Для создания и управления приложением Qt Widgets
 #include <QWidget>            // Базовый класс для всех виджетов
 #include <QLabel>             // Виджет для отображения текста
@@ -22,24 +21,40 @@ class ModbusCommandWidget : public QWidget {
     Q_OBJECT
 
 public:
-    ModbusCommandWidget(QWidget *parent = nullptr);
+    explicit ModbusCommandWidget(QWidget *parent = nullptr);
 
-private slots:
+signals:
+    void dataReady(const QByteArray &data);
+
+public slots:
     // Слот для обновления видимости полей Quantity и Value в зависимости от функции
     void updateVisibility(int func) const;
 
     // Слот для построения Modbus команды в виде HEX строки
     void buildCommand() const;
 
-    static quint16 crc16(const QByteArray &data);
+    // Слот - слушатель нажатия на кнопку sendFrame
+    void handleSendButtonClicked();
+
+    void onDataReceived(std::vector<uint8_t> data);
+
+public slots:
+
+
+
+public:
+    QPushButton *sendButton;
 
 private:
+    static quint16 crc16( QByteArray &data);
+    QByteArray *cmd; // Массив для формирования команды
     QComboBox *functionCombo;
     QSpinBox *slaveIdSpin;
     QSpinBox *startAddressSpin;
     QSpinBox *quantitySpin;
     QSpinBox *valueSpin;
     QTextEdit *outputText;
+    QTextEdit *inputText;
 };
 
 #endif //UNTITLED_MODBUSCOMMANDWIDGET_H

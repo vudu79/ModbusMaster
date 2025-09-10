@@ -1,38 +1,64 @@
-#include <QPushButton>
-#include <QGuiApplication>
-#include <QQmlApplicationEngine>
-#include <QWidget>            // Базовый класс для всех виджетов
-#include <QApplication>       // Для создания и управления приложением Qt Widgets
-#include <cstdlib>
-#include <unistd.h>
-#include <iostream>
-#include <termios.h>
-#include <sys/select.h>
 
+#include <QQmlApplicationEngine>
+#include <unistd.h>
+#include <termios.h>
 #include "ModbusCommandBuilder.h"
 #include "ModbusCommandWidget.h"
-#include "modbus_rtu_wrighter.h"
-#include "serial_port_util.h"
-
+#include "ModbusCommandWrighter.h"
 
 
 // В терминале запускаем для виртуальных порта и соединяем их
 // ➜  ~ socat -d -d pty,raw,echo=0 pty,raw,echo=0
+
 
 // UI Qt QWidget
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
     ModbusCommandWidget window;
-    window.setWindowTitle("Modbus Command Builder (Qt Widgets)");
+
+    ModbusMasterProcessor* master = new ModbusMasterProcessor("/dev/ttys001", B9600);
+
+
+    QObject::connect(&window, &ModbusCommandWidget::dataReady, master, &ModbusMasterProcessor::sendFrame);
+    QObject::connect(master, &ModbusMasterProcessor::dataReceived, &window, &ModbusCommandWidget::onDataReceived);
+    window.setWindowTitle("Modbus Master Emulator");
     window.resize(400, 300);
     window.show();
+    // master->readLoop();
 
+
+   // ThreadSafeQueue<std::vector<uint8_t>> *outQueue = new ThreadSafeQueue<std::vector<uint8_t>>();
+   //  ThreadSafeQueue<std::vector<uint8_t>> *inQueue = new ThreadSafeQueue<std::vector<uint8_t>>();
+   //  SerialThread *serialThread = new SerialThread("/dev/ttys001", *outQueue, *inQueue);
+   //  serialThread->start();
+   //  while (1) {
+   //      std::vector<u_int8_t> data = {'e','r','t','7','g'};
+   //      outQueue->enqueue(data);
+   //      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+   //
+   //  }
     return app.exec();
+
 }
 
-// UI QML
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// UI QML
 // int main(int argc, char *argv[])
 // {
 //     QGuiApplication app(argc, argv);
@@ -48,7 +74,6 @@ int main(int argc, char *argv[]) {
 // }
 
 
-
 // int main(int argc, char *argv[]) {
 //     QGuiApplication application(argc, argv);
 //     QQmlApplicationEngine engine;
@@ -60,7 +85,7 @@ int main(int argc, char *argv[]) {
 //     return QGuiApplication::exec();
 //
 //     try {
-//         const ModbusRTUWrighter writer("/dev/ttys003", B9600);
+//         const ModbusMasterProcessor writer("/dev/ttys003", B9600);
 //         writer.wrightLoop();
 //     }
 //     catch (const std::exception& ex) {

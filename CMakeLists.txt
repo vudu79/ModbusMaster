@@ -25,12 +25,13 @@ add_executable(ModbusMaster main.cpp
         main.cpp
         serial_port_util.h
         serial_port_util.cpp
-        modbus_rtu_wrighter.h
-        modbus_rtu_wrighter.cpp
+        ModbusCommandWrighter.h
+        ModbusCommandWrighter.cpp
         ModbusCommandWidget.cpp
         ModbusCommandWidget.h
         ModbusCommandBuilder.h
-        ModbusCommandBuilder.cpp)
+        ModbusCommandBuilder.cpp
+        SerialThread.h)
 target_link_libraries(ModbusMaster
         Qt6::Core
         Qt6::Gui

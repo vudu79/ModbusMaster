@@ -1,4 +1,5 @@
 #include "ModbusCommandWidget.h"
+#include "ModbusCommandWrighter.h"
 
 #include <QApplication>       // Для создания и управления приложением Qt Widgets
 #include <QWidget>            // Базовый класс для всех виджетов
@@ -12,8 +13,9 @@
 
 
 ModbusCommandWidget::ModbusCommandWidget(QWidget *parent) : QWidget(parent) {
+    // выделяем память для буфера команды
+    cmd = new QByteArray();
     // Создаем виджеты интерфейса
-
     // Метка и выпадающий список для выбора функции Modbus
     QLabel *functionLabel = new QLabel("Function Code:", this);
     functionCombo = new QComboBox(this);
@@ -54,7 +56,17 @@ ModbusCommandWidget::ModbusCommandWidget(QWidget *parent) : QWidget(parent) {
     // Кнопка для построения команды
     QPushButton *buildButton = new QPushButton("Build Command", this);
 
+    // Кнопка для отправки команды
+    sendButton = new QPushButton("Send Command", this);
+    connect(sendButton, &QPushButton::clicked, this, &ModbusCommandWidget::handleSendButtonClicked);
+
     // Текстовое поле для вывода результата
+    QLabel *inputLabel = new QLabel("Запрос:", this);
+    inputText = new QTextEdit(this);
+    inputText->setReadOnly(true); // Только для чтения
+
+    // Текстовое поле для вывода результата
+    QLabel *outputLabel = new QLabel("Ответ: ", this);
     outputText = new QTextEdit(this);
     outputText->setReadOnly(true); // Только для чтения
 
@@ -84,6 +96,14 @@ ModbusCommandWidget::ModbusCommandWidget(QWidget *parent) : QWidget(parent) {
     valueLayout->addWidget(valueLabel);
     valueLayout->addWidget(valueSpin);
 
+    QVBoxLayout *inputLayout = new QVBoxLayout();
+    inputLayout->addWidget(inputLabel);
+    inputLayout->addWidget(inputText);
+
+    QVBoxLayout *outputLayout = new QVBoxLayout();
+    outputLayout->addWidget(outputLabel);
+    outputLayout->addWidget(outputText);
+
     // Добавляем все лэйауты в основной вертикальный лэйаут
     mainLayout->addLayout(functionLayout);
     mainLayout->addLayout(slaveIdLayout);
@@ -91,7 +111,9 @@ ModbusCommandWidget::ModbusCommandWidget(QWidget *parent) : QWidget(parent) {
     mainLayout->addLayout(quantityLayout);
     mainLayout->addLayout(valueLayout);
     mainLayout->addWidget(buildButton);
-    mainLayout->addWidget(outputText);
+    mainLayout->addLayout(inputLayout);
+    mainLayout->addWidget(sendButton);
+    mainLayout->addLayout(outputLayout);
 
     // Устанавливаем основной лэйаут для окна
     setLayout(mainLayout);
@@ -107,7 +129,20 @@ ModbusCommandWidget::ModbusCommandWidget(QWidget *parent) : QWidget(parent) {
     updateVisibility(1);
 }
 
-quint16 ModbusCommandWidget::crc16(const QByteArray &data) {
+
+void ModbusCommandWidget::onDataReceived(std::vector<uint8_t> data){
+    QString hexString;
+    for (uint8_t byte : data) {
+        hexString += QString::number(byte, 16).rightJustified(2, '0');
+    }
+    outputText->setPlainText(hexString);
+}
+
+void ModbusCommandWidget::handleSendButtonClicked() {
+    emit dataReady(*cmd);
+}
+
+quint16 ModbusCommandWidget::crc16(QByteArray &data) {
     quint16 crc = 0xFFFF;
     for (auto b: data) {
         crc ^= static_cast<quint8>(b);
@@ -124,7 +159,7 @@ quint16 ModbusCommandWidget::crc16(const QByteArray &data) {
 // Слот для обновления видимости полей Quantity и Value в зависимости от функции
 void ModbusCommandWidget::updateVisibility(int index) const {
     int func = functionCombo->currentData().toInt();
-    outputText->setPlainText(QString::number(func));
+    inputText->setPlainText("Команда: " + QString::number(func));
 
     // int func = functionCombo->currentData().toInt();
     // Для функций чтения показываем Quantity, скрываем Value
@@ -151,8 +186,7 @@ void ModbusCommandWidget::updateVisibility(int index) const {
 
 // Слот для построения Modbus команды в виде HEX строки
 void ModbusCommandWidget::buildCommand() const {
-    QByteArray cmd;
-
+    if (cmd->length()> 0) cmd->clear();
     int slaveId = slaveIdSpin->value();
     int func = functionCombo->currentData().toInt();
     int startAddr = startAddressSpin->value();
@@ -161,10 +195,10 @@ void ModbusCommandWidget::buildCommand() const {
 
     // Формируем команду по протоколу Modbus RTU (без CRC для простоты)
 
-    cmd.append(static_cast<char>(slaveId)); // Адрес ведомого
-    cmd.append(static_cast<char>(func)); // Код функции
-    cmd.append(static_cast<char>((startAddr >> 8) & 0xFF)); // Старший байт адреса
-    cmd.append(static_cast<char>(startAddr & 0xFF)); // Младший байт адреса
+    cmd->append(static_cast<char>(slaveId)); // Адрес ведомого
+    cmd->append(static_cast<char>(func)); // Код функции
+    cmd->append(static_cast<char>((startAddr >> 8) & 0xFF)); // Старший байт адреса
+    cmd->append(static_cast<char>(startAddr & 0xFF)); // Младший байт адреса
 
     // В зависимости от функции добавляем параметры
     switch (func) {
@@ -172,42 +206,44 @@ void ModbusCommandWidget::buildCommand() const {
         case 2: // Read Discrete Inputs
         case 3: // Read Holding Registers
         case 4: // Read Input Registers
-            cmd.append(static_cast<char>((quantity >> 8) & 0xFF)); // Старший байт количества
-            cmd.append(static_cast<char>(quantity & 0xFF)); // Младший байт количества
+            cmd->append(static_cast<char>((quantity >> 8) & 0xFF)); // Старший байт количества
+            cmd->append(static_cast<char>(quantity & 0xFF)); // Младший байт количества
             break;
 
         case 5: // Write Single Coil
             if (value == 0)
-                cmd.append(char(0x00)).append(char(0x00)); // Выключить катушку
+                cmd->append(char(0x00)).append(char(0x00)); // Выключить катушку
             else
-                cmd.append(char(0xFF)).append(char(0x00)); // Включить катушку
+                cmd->append(char(0xFF)).append(char(0x00)); // Включить катушку
             break;
 
         case 6: // Write Single Register
-            cmd.append(static_cast<char>((value >> 8) & 0xFF)); // Старший байт значения
-            cmd.append(static_cast<char>(value & 0xFF)); // Младший байт значения
+            cmd->append(static_cast<char>((value >> 8) & 0xFF)); // Старший байт значения
+            cmd->append(static_cast<char>(value & 0xFF)); // Младший байт значения
             break;
 
         case 15: // Write Multiple Coils
         case 16: // Write Multiple Registers
-            cmd.append(static_cast<char>((quantity >> 8) & 0xFF)); // Старший байт количества
-            cmd.append(static_cast<char>(quantity & 0xFF)); // Младший байт количества
+            cmd->append(static_cast<char>((quantity >> 8) & 0xFF)); // Старший байт количества
+            cmd->append(static_cast<char>(quantity & 0xFF)); // Младший байт количества
             // Для простоты не добавляем данные (payload)
             break;
 
         default: {
-
         }
     }
 
+
+
+
     // В конце - CRC
-    const quint16 crc = crc16(cmd);
-    cmd.append(static_cast<char>(crc >> 8 & 0xFF));
-    cmd.append(static_cast<char>(crc & 0xFF));
+    quint16 crc = crc16(*cmd);
+    cmd->append(static_cast<char>(crc & 0xFF));
+    cmd->append(static_cast<char>(crc >> 8 & 0xFF));
 
     // Преобразуем команду в HEX строку с пробелами и заглавными буквами
-    QString hexStr = cmd.toHex(' ').toUpper();
+    QString hexStr = cmd->toHex(' ').toUpper();
 
     // Выводим результат в текстовое поле
-    outputText->setPlainText(hexStr);
+    inputText->setPlainText(hexStr);
 }
