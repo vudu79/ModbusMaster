@@ -1,8 +1,6 @@
 
-#include <QQmlApplicationEngine>
 #include <unistd.h>
 #include <termios.h>
-#include "ModbusCommandBuilder.h"
 #include "ModbusCommandWidget.h"
 #include "ModbusCommandWrighter.h"
 
